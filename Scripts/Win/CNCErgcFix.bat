@@ -37,7 +37,6 @@ setlocal enabledelayedexpansion
     set reg_branch=
 
     : Check win version
-    set errorlevel=0
     systeminfo | find "x64-based PC" > nul
     if %errorlevel%==0 (
         set reg_branch=%win64regpath%
@@ -158,7 +157,6 @@ setlocal enabledelayedexpansion
             exit /b
         )
     exit /b
-
 
 : Other procedures
     : Log message to console with timestamp
