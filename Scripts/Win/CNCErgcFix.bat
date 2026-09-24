@@ -9,37 +9,48 @@
 cd /d %~dp0
 setlocal enabledelayedexpansion
 
-: General for bat type
-set ps=powershell
-set psc=%ps% -nop -c
-set "COLOR.GREEN=42;97m"
-set "COLOR.RED=41;97m"
-set opcode=
+: Evaluate rights to the admin
+    net session >nul 2>&1
+    if not %errorlevel%==0 (
+        powershell "start %0 -verb runas"
+        exit /b
+    )
 
-: General for this specific bat
-set log_file=CNCErgcFix.log
-set dir_name=CNCErgcFix
-set option_ad=%appdata%\%dir_name%
-set option_lad=%localappdata%\%dir_name%
-set option_sd=%systemdrive%\%dir_name%
-set win64regpath=HKLM\SOFTWARE\WOW6432Node\Electronic Arts
-set win32regpath=HKLM\SOFTWARE\Electronic Arts
-set ergc_key=KEKW%date:~0,2%%date:~3,2%%date:~6,4%%time:~0,2%%time:~3,2%%time:~6,2%%time:~9,2%
-set install_dir=%option_ad%
-set reg_branch=
+: Variables and constans
+    : General for bat type
+    set ps=powershell
+    set psc=%ps% -nop -c
+    set "COLOR.GREEN=42;97m"
+    set "COLOR.RED=41;97m"
+    set opcode=
 
-systeminfo | find "x64-based PC" > nul
-if %errorlevel%==0 (
-    set reg_branch=%win64regpath%
-) else (
-    set reg_branch=%win32regpath%
-)
+    : General for this specific bat
+    set log_file=CNCErgcFix.log
+    set dir_name=CNCErgcFix
+    set option_ad=%appdata%\%dir_name%
+    set option_lad=%localappdata%\%dir_name%
+    set option_sd=%systemdrive%\%dir_name%
+    set win64regpath=HKLM\SOFTWARE\WOW6432Node\Electronic Arts
+    set win32regpath=HKLM\SOFTWARE\Electronic Arts
+    set ergc_key=KEKW%date:~0,2%%date:~3,2%%date:~6,4%%time:~0,2%%time:~3,2%%time:~6,2%%time:~9,2%
+    set install_dir=%option_ad%
+    set reg_branch=
 
-set "G=%reg_branch%\EA Games\Generals\ergc"
-set "ZH=%reg_branch%\EA Games\Command and Conquer Generals Zero Hour\ergc"
-set "TW=%reg_branch%\Electronic Arts\Command and Conquer 3\ergc"
-set "KW=%reg_branch%\Electronic Arts\Command and Conquer 3 Kanes Wrath\ergc"
-set "RA3=%reg_branch%\Electronic Arts\Red Alert 3\ergc"
+    : Check win version
+    set errorlevel=0
+    systeminfo | find "x64-based PC" > nul
+    if %errorlevel%==0 (
+        set reg_branch=%win64regpath%
+    ) else (
+        set reg_branch=%win32regpath%
+    )
+
+    : Game registry branches
+    set "G=%reg_branch%\EA Games\Generals\ergc"
+    set "ZH=%reg_branch%\EA Games\Command and Conquer Generals Zero Hour\ergc"
+    set "TW=%reg_branch%\Electronic Arts\Command and Conquer 3\ergc"
+    set "KW=%reg_branch%\Electronic Arts\Command and Conquer 3 Kanes Wrath\ergc"
+    set "RA3=%reg_branch%\Electronic Arts\Red Alert 3\ergc"
 
 : Menu procedures
     :cycle
@@ -58,7 +69,7 @@ set "RA3=%reg_branch%\Electronic Arts\Red Alert 3\ergc"
     : Batch file main menu
     :menu
         cls
-        title CNC ergc Key Watcher
+        title CNC ergc Key Fix
         mode 76, 30
         echo: 
         echo: 
@@ -97,7 +108,7 @@ set "RA3=%reg_branch%\Electronic Arts\Red Alert 3\ergc"
 
 : Main procedures
     :legacy_fix
-        call :write "%COLOR.GREEN%" "Set a new key %ergc_key% in the %reg_branch%..."
+        call :write "%COLOR.GREEN%" "The new key is %ergc_key%"
         call :log "Set a new key for Generals..."
         reg add "%reg_branch%\EA Games\Generals\ergc"                                 /ve /t REG_SZ /d "%ergc_key%" /f
         call :log "Set a new key for GeneralsZH..."
@@ -111,7 +122,6 @@ set "RA3=%reg_branch%\Electronic Arts\Red Alert 3\ergc"
         call :write "%COLOR.GREEN%" "Done"
         if not "%~1"=="1" pause
     exit /b
-
 
     :status
         call :write "%COLOR.GREEN%" "Done"
