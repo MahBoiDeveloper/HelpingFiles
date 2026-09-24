@@ -56,7 +56,7 @@ setlocal enabledelayedexpansion
         call :menu
         if %opcode%==1 call :write "%COLOR.RED%" "WIP" & pause & goto :cycle
         if %opcode%==2 call :write "%COLOR.RED%" "WIP" & pause & goto :cycle
-        if %opcode%==3 call :write "%COLOR.RED%" "WIP" & pause & goto :cycle
+        if %opcode%==3 call :status     & goto :cycle
         if %opcode%==4 call :legacy_fix & goto :cycle
         if %opcode%==5 call :write "%COLOR.RED%" "WIP" & pause & goto :cycle
         if %opcode%==6 call :select_dir & goto :cycle
@@ -124,6 +124,7 @@ setlocal enabledelayedexpansion
 
     :status
         call :write "%COLOR.GREEN%" "Done"
+        %psc% "$text = [IO.File]::ReadAllText('%~f0'); $code = ($text -split '(?m)^:__PS_SCRIPT__\r?\n', 2)[1]; & ([scriptblock]::Create($code))"
         if not "%~1"=="1" pause
     exit /b
 
@@ -176,4 +177,8 @@ setlocal enabledelayedexpansion
     exit /b
 
 :exit
-:eof
+goto :eof
+
+: powershell file content
+:__PS_SCRIPT__
+Write-Host "Hello World"
