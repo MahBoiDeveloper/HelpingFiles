@@ -60,7 +60,7 @@ setlocal enabledelayedexpansion
         if %opcode%==4 call :legacy_fix & goto :cycle
         if %opcode%==5 call :write "%COLOR.RED%" "WIP" & pause & goto :cycle
         if %opcode%==6 call :select_dir & goto :cycle
-        if %opcode%==7 call :write "%COLOR.RED%" "WIP" & pause & goto :cycle
+        if %opcode%==7 call :manual_key & goto :cycle
         if %opcode%==8 call :write "%COLOR.RED%" "WIP" & pause & goto :cycle
         if %opcode%==9 call :write "%COLOR.RED%" "WIP" & pause & goto :cycle
     goto :exit
@@ -87,13 +87,14 @@ setlocal enabledelayedexpansion
         echo:             __________________________________________________
         echo:             
         echo:             [6] Change install directory
-        echo:             [7] WIP
+        echo:             [7] Change new ergc key
         echo:             [8] WIP
         echo:             [9] WIP
         echo: 
         echo:             [0] Exit
         echo:       ______________________________________________________________
         echo: 
+        echo:             New key: %ergc_key%
         echo:             Install dir: %install_dir%
         echo: 
         call :write "%COLOR.GREEN%" "                  Enter key from set [0,1,2,3,4,5,6,7,8,9]                  "
@@ -108,22 +109,30 @@ setlocal enabledelayedexpansion
 : Main procedures
     :legacy_fix
         call :write "%COLOR.GREEN%" "The new key is %ergc_key%"
+        echo.
+
         call :log "Set a new key for Generals..."
-        reg add "%reg_branch%\EA Games\Generals\ergc"                                 /ve /t REG_SZ /d "%ergc_key%" /f
+        reg add "%G%" /ve /t REG_SZ /d "%ergc_key%" /f
         call :log "Set a new key for GeneralsZH..."
-        reg add "%reg_branch%\EA Games\Command and Conquer Generals Zero Hour\ergc"   /ve /t REG_SZ /d "%ergc_key%" /f
+        reg add "%ZH%" /ve /t REG_SZ /d "%ergc_key%" /f
         call :log "Set a new key for TW..."
-        reg add "%reg_branch%\Electronic Arts\Command and Conquer 3\ergc"             /ve /t REG_SZ /d "%ergc_key%" /f
+        reg add "%TW%" /ve /t REG_SZ /d "%ergc_key%" /f
         call :log "Set a new key for KW..."
-        reg add "%reg_branch%\Electronic Arts\Command and Conquer 3 Kanes Wrath\ergc" /ve /t REG_SZ /d "%ergc_key%" /f
+        reg add "%KW%" /ve /t REG_SZ /d "%ergc_key%" /f
         call :log "Set a new key for RA3..."
-        reg add "%reg_branch%\Electronic Arts\Red Alert 3\ergc"                       /ve /t REG_SZ /d "%ergc_key%" /f
+        reg add "%RA3%" /ve /t REG_SZ /d "%ergc_key%" /f
+        
+        echo.
         call :write "%COLOR.GREEN%" "Done"
         if not "%~1"=="1" pause
     exit /b
 
     :status
-        call :write "%COLOR.GREEN%" "Done"
+        reg query "%G%"   /ve 2>nul | findstr /c:"REG_SZ" | %psc% "$v = $input -replace '^.*?REG_SZ\s*',''; $b = $v -and $v -ne '%%CDKEY%%'; $bg = if ($b) { 'Green' } else { 'DarkRed' }; Write-Host ('Generals:      ') -n; Write-Host $v -back $bg -fore White"
+        reg query "%ZH%"  /ve 2>nul | findstr /c:"REG_SZ" | %psc% "$v = $input -replace '^.*?REG_SZ\s*',''; $b = $v -and $v -ne '%%CDKEY%%'; $bg = if ($b) { 'Green' } else { 'DarkRed' }; Write-Host ('Zero Hour:     ') -n; Write-Host $v -back $bg -fore White"
+        reg query "%TW%"  /ve 2>nul | findstr /c:"REG_SZ" | %psc% "$v = $input -replace '^.*?REG_SZ\s*',''; $b = $v -and $v -ne '%%CDKEY%%'; $bg = if ($b) { 'Green' } else { 'DarkRed' }; Write-Host ('Tiberium Wars: ') -n; Write-Host $v -back $bg -fore White"
+        reg query "%KW%"  /ve 2>nul | findstr /c:"REG_SZ" | %psc% "$v = $input -replace '^.*?REG_SZ\s*',''; $b = $v -and $v -ne '%%CDKEY%%'; $bg = if ($b) { 'Green' } else { 'DarkRed' }; Write-Host ('Kanes Wrath:   ') -n; Write-Host $v -back $bg -fore White"
+        reg query "%RA3%" /ve 2>nul | findstr /c:"REG_SZ" | %psc% "$v = $input -replace '^.*?REG_SZ\s*',''; $b = $v -and $v -ne '%%CDKEY%%'; $bg = if ($b) { 'Green' } else { 'DarkRed' }; Write-Host ('Red Alert 3:   ') -n; Write-Host $v -back $bg -fore White"
         if not "%~1"=="1" pause
     exit /b
 
@@ -156,6 +165,16 @@ setlocal enabledelayedexpansion
         if %opcode%==0 (
             exit /b
         )
+    exit /b
+
+    :manual_key
+        set "new_ergc_key="
+        set /p "new_ergc_key=Enter new ergc key: "
+        if not defined new_ergc_key (
+            call :write "%COLOR.RED%" "The key cannot be empty"
+            goto :manual_key
+        )
+        set "ergc_key=!new_ergc_key!"
     exit /b
 
 : Other procedures
