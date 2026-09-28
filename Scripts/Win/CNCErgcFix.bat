@@ -124,7 +124,6 @@ setlocal enabledelayedexpansion
 
     :status
         call :write "%COLOR.GREEN%" "Done"
-        %psc% "$text = [IO.File]::ReadAllText('%~f0'); $code = ($text -split '(?m)^:__PS_SCRIPT__\r?\n', 2)[1]; & ([scriptblock]::Create($code))"
         if not "%~1"=="1" pause
     exit /b
 
@@ -179,6 +178,8 @@ setlocal enabledelayedexpansion
 :exit
 goto :eof
 
-: powershell file content
+: PowerShell script content
+: To run this text as PS script use cmd batch code:
+: %psc% "$text = [IO.File]::ReadAllText('%~f0'); $code = ($text -split '(?m)^:__PS_SCRIPT__\r?\n', 2)[1]; & ([scriptblock]::Create($code))"
 :__PS_SCRIPT__
 Write-Host "Hello World"
