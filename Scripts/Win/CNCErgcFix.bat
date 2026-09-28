@@ -201,4 +201,174 @@ goto :eof
 : To run this text as PS script use cmd batch code:
 : %psc% "$text = [IO.File]::ReadAllText('%~f0'); $code = ($text -split '(?m)^:__PS_SCRIPT__\r?\n', 2)[1]; & ([scriptblock]::Create($code))"
 :__PS_SCRIPT__
-Write-Host "Hello World"
+$ErrorActionPreference = 'Continue'
+
+# TODO: Change path
+$LogFile = 'C:\ProgramData\CNCErgcFix\CNCErgcFix.log'
+
+if ([Environment]::Is64BitOperatingSystem)
+{
+    $RegistryBase = 'SOFTWARE\WOW6432Node\Electronic Arts'
+    $WmiRootPath  = 'SOFTWARE\\WOW6432Node\\Electronic Arts'
+}
+else
+{
+    $RegistryBase = 'SOFTWARE\Electronic Arts'
+    $WmiRootPath  = 'SOFTWARE\\Electronic Arts'
+}
+
+
+$ErgcPaths = @(
+    "$RegistryBase\EA Games\Command and Conquer Generals Zero Hour\ergc",
+    "$RegistryBase\EA Games\Generals\ergc",
+    "$RegistryBase\Electronic Arts\Command and Conquer 3\ergc",
+    "$RegistryBase\Electronic Arts\Command and Conquer 3 Kanes Wrath\ergc",
+    "$RegistryBase\Electronic Arts\Red Alert 3\ergc"
+)
+
+
+function Write-Log
+{
+    param(
+        [string]$Message
+    )
+
+    $Timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'
+
+    Add-Content `
+        -LiteralPath $LogFile `
+        -Value "[$Timestamp] $Message" `
+        -Encoding UTF8
+}
+
+function New-ErgcKey { return 'KEKW' + (Get-Date -Format 'ddMMyyyyHHmmssff') }
+
+function Repair-Ergc
+{
+    try
+    {
+        $BadKeys = @()
+        foreach ($SubKeyPath in $ErgcPaths) {
+            $Key = $null
+            try
+            {
+                $Key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey(
+                    $SubKeyPath,
+                    $false
+                )
+
+                if ($null -eq $Key)
+                    continue
+
+                # If empty then value is "(Default)"
+                $Value = $Key.GetValue(
+                    '',
+                    $null,
+                    [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
+                )
+
+                if ($Value -is [string] -and $Value -ceq '%CDKEY%')
+                    $BadKeys += $SubKeyPath
+            }
+            finally
+            {
+                if ($null -ne $Key)
+                    $Key.Dispose()
+            }
+        }
+
+        if ($BadKeys.Count -eq 0) {
+            return
+        }
+
+        $NewValue = New-ErgcKey
+
+        foreach ($SubKeyPath in $BadKeys) {
+            $Key = $null
+            try
+            {
+                $Key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey(
+                    $SubKeyPath,
+                    $true
+                )
+
+                if ($null -eq $Key)
+                    continue
+
+                # Ещё раз проверяем значение непосредственно перед записью.
+                $CurrentValue = $Key.GetValue(
+                    '',
+                    $null,
+                    [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
+                )
+
+                if ($CurrentValue -is [string] -and $CurrentValue -ceq '%CDKEY%')
+                    {
+                        $Key.SetValue(
+                            '',
+                            $NewValue,
+                            [Microsoft.Win32.RegistryValueKind]::String
+                    )
+
+                    Write-Log "Fixed: HKLM\$SubKeyPath -> $NewValue"
+                }
+            }
+            finally
+            {
+                if ($null -ne $Key)
+                {
+                    $Key.Dispose()
+                }
+            }
+        }
+    }
+    catch {
+
+        Write-Log "ERROR: $($_.Exception.Message)"
+    }
+}
+
+#
+Write-Log "CNCErgcFix watcher started."
+Repair-Ergc
+
+# ------------------------------------------------------------
+# WMI watcher
+#
+# Listen events in Electronic Arts.
+# ------------------------------------------------------------
+
+$Query = @"
+SELECT *
+FROM RegistryTreeChangeEvent
+WHERE Hive = 'HKEY_LOCAL_MACHINE'
+AND RootPath = '$WmiRootPath'
+"@
+
+try
+{
+    Register-WmiEvent -Namespace 'root\default' -Query $Query -SourceIdentifier 'CNCErgcFix.RegistryChange' | Out-Null
+
+    while ($true)
+    {
+
+        $Event = Wait-Event -SourceIdentifier 'CNCErgcFix.RegistryChange'
+
+        if ($null -ne $Event)
+            Remove-Event -EventIdentifier $Event.EventIdentifier -ErrorAction SilentlyContinue
+
+        # Timeout to wait the game finish write
+        Start-Sleep -Milliseconds 50
+
+        Repair-Ergc
+    }
+}
+catch
+{
+    Write-Log "WMI WATCHER ERROR: $($_.Exception.Message)"
+    exit 1
+}
+finally
+{
+    Unregister-Event -SourceIdentifier 'CNCErgcFix.RegistryChange' -ErrorAction SilentlyContinue
+}
