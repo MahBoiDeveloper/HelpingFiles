@@ -242,23 +242,15 @@ setlocal enabledelayedexpansion
         schtasks /end /tn "%task_name%" > nul 2> nul
         call :log "Delete the %task_name% scheduled task..."
         schtasks /delete /tn "%task_name%" /f > nul 2> nul
-        for /f "delims=" %%U in ('whoami.exe') do set "task_user=%%U"
-
-        if not defined task_user (
-            call :write "%COLOR.RED%" "Failed to determine the administrator account"
-            if not "%~1"=="1" pause
-            exit /b 1
-        )
 
         call :log "Register the %task_name% scheduled task..."
         schtasks /create ^
             /tn "%task_name%" ^
             /sc ONSTART ^
-            /ru "!task_user!" ^
+            /ru "SYSTEM" ^
             /np ^
             /rl HIGHEST ^
-            /tr "%psf% ""%install_dir%\%ps_file%""" ^
-            /f
+            /tr "%psf% '%install_dir%\%ps_file%'"
 
         if errorlevel 1 (
             call :write "%COLOR.RED%" "Failed to create the scheduled task"
@@ -280,10 +272,18 @@ setlocal enabledelayedexpansion
     exit /b
 
     :remove_fix
+        call :log "Stop the %task_name% scheduled task..."
+        schtasks /end /tn "%task_name%" > nul 2> nul
+
+        call :log "Delete the %task_name% scheduled task..."
+        schtasks /delete /tn "%task_name%" /f > nul 2> nul
+
+        call :log "Remove folders with script..."
         rmdir /s /q "%option_ad%" > nul 2> nul
         rmdir /s /q "%option_lad%" > nul 2> nul
         rmdir /s /q "%option_sd%" > nul 2> nul
         rmdir /s /q "%install_dir%" > nul 2> nul
+        
         call :write "%COLOR.GREEN%" "Done"
         if not "%~1"=="1" pause
     exit /b
