@@ -112,7 +112,7 @@ setlocal enabledelayedexpansion
 : Main procedures
     :install_fix
         call :log "Install script to the %install_dir% folder..."
-        mkdir %install_dir% > nul 2> nul
+        mkdir "%install_dir%" > nul 2> nul
         (
             echo $LogFile = '%install_dir%\%log_file%'
 
@@ -197,6 +197,8 @@ setlocal enabledelayedexpansion
             echo "@
 
             echo Write-Log "CNCErgcFix watcher started."
+            echo Write-Log "Rewrite ergc on the start."
+            echo Repair-Ergc
             echo try
             echo {
             echo     Register-WmiEvent -Namespace 'root\default' -Query $Query -SourceIdentifier 'CNCErgcFix.RegistryChange' ^| Out-Null
@@ -220,7 +222,7 @@ setlocal enabledelayedexpansion
             echo     Unregister-Event -SourceIdentifier 'CNCErgcFix.RegistryChange' -ErrorAction SilentlyContinue
             echo }
 
-        ) > %install_dir%\%ps_file%
+        ) > "%install_dir%\%ps_file%"
         
         call :write "%COLOR.GREEN%" "Done"
         if not "%~1"=="1" pause
