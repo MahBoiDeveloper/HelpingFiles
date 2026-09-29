@@ -166,7 +166,7 @@ setlocal enabledelayedexpansion
             echo                 $Key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey^($SubKeyPath, $true^)
             echo                 if ^($null -eq $Key^)
             echo                     continue
-            echo                 # Ещё раз проверяем значение непосредственно перед записью.
+            echo                 # Check value before write
             echo                 $CurrentValue = $Key.GetValue^('', $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames^)
             echo                 if ^($CurrentValue -is [string] -and $CurrentValue -ceq '%%CDKEY%%'^)
             echo                 {
