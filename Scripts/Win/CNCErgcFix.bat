@@ -167,11 +167,7 @@ setlocal enabledelayedexpansion
             echo                 if ^($null -eq $Key^)
             echo                     continue
             echo                 # Ещё раз проверяем значение непосредственно перед записью.
-            echo                 $CurrentValue = $Key.GetValue^(
-            echo                     '',
-            echo                     $null,
-            echo                     [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
-            echo                 ^)
+            echo                 $CurrentValue = $Key.GetValue^('', $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames^)
             echo                 if ^($CurrentValue -is [string] -and $CurrentValue -ceq '%%CDKEY%%'^)
             echo                 {
             echo                         $Key.SetValue^('', $NewValue, [Microsoft.Win32.RegistryValueKind]::String^)
@@ -191,15 +187,6 @@ setlocal enabledelayedexpansion
             echo     }
             echo }
 
-            echo Write-Log "CNCErgcFix watcher started."
-            echo Repair-Ergc
-
-            echo # ------------------------------------------------------------
-            echo # WMI watcher
-            echo #
-            echo # Listen events in Electronic Arts.
-            echo # ------------------------------------------------------------
-
             echo $Query = @"
             echo SELECT *
             echo FROM RegistryTreeChangeEvent
@@ -207,6 +194,7 @@ setlocal enabledelayedexpansion
             echo AND RootPath = '$WmiRootPath'
             echo "@
 
+            echo Write-Log "CNCErgcFix watcher started."
             echo try
             echo {
             echo     Register-WmiEvent -Namespace 'root\default' -Query $Query -SourceIdentifier 'CNCErgcFix.RegistryChange' ^| Out-Null
