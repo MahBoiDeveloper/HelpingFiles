@@ -56,7 +56,7 @@ setlocal enabledelayedexpansion
     :cycle
         call :menu
         if %opcode%==1 call :install_fix & goto :cycle
-        if %opcode%==2 call :write "%COLOR.RED%" "WIP" & pause & goto :cycle
+        if %opcode%==2 call :remove_fix  & goto :cycle
         if %opcode%==3 call :status      & goto :cycle
         if %opcode%==4 call :legacy_fix  & goto :cycle
         if %opcode%==5 call :write "%COLOR.RED%" "WIP" & pause & goto :cycle
@@ -75,7 +75,7 @@ setlocal enabledelayedexpansion
         echo: 
         echo: 
         call :write "%COLOR.RED%"   "           WARNING: THIS SCRIPT EDITS YOUR TASK SCHEDULER SETTINGS          "
-        : dcall :write "%COLOR.RED%"   "               THIS PROGRAM COMES WITH ABSOLUTELY NO WARRANTY               "
+        : call :write "%COLOR.RED%"   "               THIS PROGRAM COMES WITH ABSOLUTELY NO WARRANTY               "
         echo:       ______________________________________________________________
         echo: 
         echo:                                   ACTIONS 
@@ -241,6 +241,15 @@ setlocal enabledelayedexpansion
 
         ) > %install_dir%\%ps_file%
         
+        call :write "%COLOR.GREEN%" "Done"
+        if not "%~1"=="1" pause
+    exit /b
+
+    :remove_fix
+        rmdir /s /q "%option_ad%" > nul 2> nul
+        rmdir /s /q "%option_lad%" > nul 2> nul
+        rmdir /s /q "%option_sd%" > nul 2> nul
+        rmdir /s /q "%install_dir%" > nul 2> nul
         call :write "%COLOR.GREEN%" "Done"
         if not "%~1"=="1" pause
     exit /b
