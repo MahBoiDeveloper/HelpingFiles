@@ -33,8 +33,8 @@ setlocal enabledelayedexpansion
     set option_ad=%appdata%\%dir_name%
     set option_lad=%localappdata%\%dir_name%
     set option_sd=%systemdrive%\%dir_name%
-    set win64regpath=HKLM\SOFTWARE\WOW6432Node\Electronic Arts
-    set win32regpath=HKLM\SOFTWARE\Electronic Arts
+    set win64regpath=SOFTWARE\WOW6432Node\Electronic Arts
+    set win32regpath=SOFTWARE\Electronic Arts
     set ergc_key=KEKW%date:~0,2%%date:~3,2%%date:~6,4%%time:~0,2%%time:~3,2%%time:~6,2%%time:~9,2%
     set install_dir=%option_sd%
     set reg_branch=
@@ -293,15 +293,15 @@ setlocal enabledelayedexpansion
         echo.
 
         call :log "Set a new key for Generals..."
-        reg add "%G%" /ve /t REG_SZ /d "%ergc_key%" /f
+        reg add "HKLM\%G%" /ve /t REG_SZ /d "%ergc_key%" /f
         call :log "Set a new key for GeneralsZH..."
-        reg add "%ZH%" /ve /t REG_SZ /d "%ergc_key%" /f
+        reg add "HKLM\%ZH%" /ve /t REG_SZ /d "%ergc_key%" /f
         call :log "Set a new key for TW..."
-        reg add "%TW%" /ve /t REG_SZ /d "%ergc_key%" /f
+        reg add "HKLM\%TW%" /ve /t REG_SZ /d "%ergc_key%" /f
         call :log "Set a new key for KW..."
-        reg add "%KW%" /ve /t REG_SZ /d "%ergc_key%" /f
+        reg add "HKLM\%KW%" /ve /t REG_SZ /d "%ergc_key%" /f
         call :log "Set a new key for RA3..."
-        reg add "%RA3%" /ve /t REG_SZ /d "%ergc_key%" /f
+        reg add "HKLM\%RA3%" /ve /t REG_SZ /d "%ergc_key%" /f
         
         echo.
         call :write "%COLOR.GREEN%" "Done"
