@@ -237,6 +237,43 @@ setlocal enabledelayedexpansion
             echo }
 
         ) > "%install_dir%\%ps_file%"
+
+        call :log "Stop the %task_name% scheduled task..."
+        schtasks /end /tn "%task_name%" > nul 2> nul
+        call :log "Delete the %task_name% scheduled task..."
+        schtasks /delete /tn "%task_name%" /f > nul 2> nul
+        for /f "delims=" %%U in ('whoami.exe') do set "task_user=%%U"
+
+        if not defined task_user (
+            call :write "%COLOR.RED%" "Failed to determine the administrator account"
+            if not "%~1"=="1" pause
+            exit /b 1
+        )
+
+        call :log "Register the %task_name% scheduled task..."
+        schtasks /create ^
+            /tn "%task_name%" ^
+            /sc ONSTART ^
+            /ru "!task_user!" ^
+            /np ^
+            /rl HIGHEST ^
+            /tr "%psf% ""%install_dir%\%ps_file%""" ^
+            /f
+
+        if errorlevel 1 (
+            call :write "%COLOR.RED%" "Failed to create the scheduled task"
+            if not "%~1"=="1" pause
+            exit /b 1
+        )
+
+        call :log "Start the %task_name% scheduled task as !task_user!..."
+        schtasks /run /tn "%task_name%" > nul 2> nul
+
+        if errorlevel 1 (
+            call :write "%COLOR.RED%" "The task was created, but failed to start"
+            if not "%~1"=="1" pause
+            exit /b 1
+        )
         
         call :write "%COLOR.GREEN%" "Done"
         if not "%~1"=="1" pause
