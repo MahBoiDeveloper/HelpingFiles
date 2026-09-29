@@ -55,13 +55,13 @@ setlocal enabledelayedexpansion
 : Menu procedures
     :cycle
         call :menu
-        if %opcode%==1 call :write "%COLOR.RED%" "WIP" & pause & goto :cycle
+        if %opcode%==1 call :install_fix & goto :cycle
         if %opcode%==2 call :write "%COLOR.RED%" "WIP" & pause & goto :cycle
-        if %opcode%==3 call :status     & goto :cycle
-        if %opcode%==4 call :legacy_fix & goto :cycle
+        if %opcode%==3 call :status      & goto :cycle
+        if %opcode%==4 call :legacy_fix  & goto :cycle
         if %opcode%==5 call :write "%COLOR.RED%" "WIP" & pause & goto :cycle
-        if %opcode%==6 call :select_dir & goto :cycle
-        if %opcode%==7 call :manual_key & goto :cycle
+        if %opcode%==6 call :select_dir  & goto :cycle
+        if %opcode%==7 call :manual_key  & goto :cycle
         if %opcode%==8 call :write "%COLOR.RED%" "WIP" & pause & goto :cycle
         if %opcode%==9 call :write "%COLOR.RED%" "WIP" & pause & goto :cycle
     goto :exit
@@ -108,6 +108,149 @@ setlocal enabledelayedexpansion
     exit /b
 
 : Main procedures
+    :install_fix
+        mkdir %install_dir%
+        (
+            echo $LogFile = '%install_dir%\%log_file%'
+
+            echo $ErgcPaths = @(
+            echo     "%G%",
+            echo     "%GZH%",
+            echo     "%TW%",
+            echo     "%KW%",
+            echo     "%RA3%",
+            echo )
+
+            echo function Write-Log
+            echo {
+            echo     param(
+            echo         [string]$Message
+            echo     )
+            echo     $Timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'
+            echo     Add-Content -LiteralPath $LogFile -Value "[$Timestamp] $Message" -Encoding UTF8
+            echo }
+
+            echo function New-ErgcKey { return 'KEKW' + (Get-Date -Format 'ddMMyyyyHHmmssff') }
+
+            echo function Repair-Ergc
+            echo {
+            echo     try
+            echo     {
+            echo         $BadKeys = @()
+            echo         foreach ($SubKeyPath in $ErgcPaths) {
+            echo             $Key = $null
+            echo             try
+            echo             {
+            echo                 $Key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey(
+            echo                     $SubKeyPath,
+            echo                     $false
+            echo                 )
+            echo                 if ($null -eq $Key)
+            echo                     continue
+            echo                 # If empty then value is "(Default)"
+            echo                 $Value = $Key.GetValue(
+            echo                     '',
+            echo                     $null,
+            echo                     [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
+            echo                 )
+            echo                 if ($Value -is [string] -and $Value -ceq '%CDKEY%')
+            echo                     $BadKeys += $SubKeyPath
+            echo             }
+            echo             finally
+            echo             {
+            echo                 if ($null -ne $Key)
+            echo                     $Key.Dispose()
+            echo             }
+            echo         }
+            echo         if ($BadKeys.Count -eq 0)
+            echo             return
+            echo         $NewValue = New-ErgcKey
+            echo         foreach ($SubKeyPath in $BadKeys)
+            echo         {
+            echo             $Key = $null
+            echo             try
+            echo             {
+            echo                 $Key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey(
+            echo                     $SubKeyPath,
+            echo                     $true
+            echo                 )
+            echo                 if ($null -eq $Key)
+            echo                     continue
+            echo                 # Ещё раз проверяем значение непосредственно перед записью.
+            echo                 $CurrentValue = $Key.GetValue(
+            echo                     '',
+            echo                     $null,
+            echo                     [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
+            echo                 )
+            echo                 if ($CurrentValue -is [string] -and $CurrentValue -ceq '%CDKEY%')
+            echo                 {
+            echo                         $Key.SetValue(
+            echo                             '',
+            echo                             $NewValue,
+            echo                             [Microsoft.Win32.RegistryValueKind]::String
+            echo                     )
+            echo                     Write-Log "Fixed: HKLM\$SubKeyPath -> $NewValue"
+            echo                 }
+            echo             }
+            echo             finally
+            echo             {
+            echo                 if ($null -ne $Key)
+            echo                 {
+            echo                     $Key.Dispose()
+            echo                 }
+            echo             }
+            echo         }
+            echo     }
+            echo     catch {
+            echo         Write-Log "ERROR: $($_.Exception.Message)"
+            echo     }
+            echo }
+
+            echo Write-Log "CNCErgcFix watcher started."
+            echo Repair-Ergc
+
+            echo # ------------------------------------------------------------
+            echo # WMI watcher
+            echo #
+            echo # Listen events in Electronic Arts.
+            echo # ------------------------------------------------------------
+
+            echo $Query = @"
+            echo SELECT *
+            echo FROM RegistryTreeChangeEvent
+            echo WHERE Hive = 'HKEY_LOCAL_MACHINE'
+            echo AND RootPath = '$WmiRootPath'
+            echo "@
+
+            echo try
+            echo {
+            echo     Register-WmiEvent -Namespace 'root\default' -Query $Query -SourceIdentifier 'CNCErgcFix.RegistryChange' | Out-Null
+            echo     while ($true)
+            echo     {
+            echo         $Event = Wait-Event -SourceIdentifier 'CNCErgcFix.RegistryChange'
+            echo         if ($null -ne $Event)
+            echo             Remove-Event -EventIdentifier $Event.EventIdentifier -ErrorAction SilentlyContinue
+            echo         # Timeout to wait the game finish write
+            echo         Start-Sleep -Milliseconds 50
+            echo         Repair-Ergc
+            echo     }
+            echo }
+            echo catch
+            echo {
+            echo     Write-Log "WMI WATCHER ERROR: $($_.Exception.Message)"
+            echo     exit 1
+            echo }
+            echo finally
+            echo {
+            echo     Unregister-Event -SourceIdentifier 'CNCErgcFix.RegistryChange' -ErrorAction SilentlyContinue
+            echo }
+
+        ) >> %install_dir%\%ps_file%
+        
+        call :write "%COLOR.GREEN%" "Done"
+        if not "%~1"=="1" pause
+    exit /b
+
     :legacy_fix
         call :write "%COLOR.GREEN%" "The new key is %ergc_key%"
         echo.
@@ -202,174 +345,4 @@ goto :eof
 : To run this text as PS script use cmd batch code:
 : %psc% "$text = [IO.File]::ReadAllText('%~f0'); $code = ($text -split '(?m)^:__PS_SCRIPT__\r?\n', 2)[1]; & ([scriptblock]::Create($code))"
 :__PS_SCRIPT__
-$ErrorActionPreference = 'Continue'
-
-# TODO: Change path
-$LogFile = 'C:\ProgramData\CNCErgcFix\CNCErgcFix.log'
-
-if ([Environment]::Is64BitOperatingSystem)
-{
-    $RegistryBase = 'SOFTWARE\WOW6432Node\Electronic Arts'
-    $WmiRootPath  = 'SOFTWARE\\WOW6432Node\\Electronic Arts'
-}
-else
-{
-    $RegistryBase = 'SOFTWARE\Electronic Arts'
-    $WmiRootPath  = 'SOFTWARE\\Electronic Arts'
-}
-
-
-$ErgcPaths = @(
-    "$RegistryBase\EA Games\Command and Conquer Generals Zero Hour\ergc",
-    "$RegistryBase\EA Games\Generals\ergc",
-    "$RegistryBase\Electronic Arts\Command and Conquer 3\ergc",
-    "$RegistryBase\Electronic Arts\Command and Conquer 3 Kanes Wrath\ergc",
-    "$RegistryBase\Electronic Arts\Red Alert 3\ergc"
-)
-
-
-function Write-Log
-{
-    param(
-        [string]$Message
-    )
-
-    $Timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'
-
-    Add-Content `
-        -LiteralPath $LogFile `
-        -Value "[$Timestamp] $Message" `
-        -Encoding UTF8
-}
-
-function New-ErgcKey { return 'KEKW' + (Get-Date -Format 'ddMMyyyyHHmmssff') }
-
-function Repair-Ergc
-{
-    try
-    {
-        $BadKeys = @()
-        foreach ($SubKeyPath in $ErgcPaths) {
-            $Key = $null
-            try
-            {
-                $Key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey(
-                    $SubKeyPath,
-                    $false
-                )
-
-                if ($null -eq $Key)
-                    continue
-
-                # If empty then value is "(Default)"
-                $Value = $Key.GetValue(
-                    '',
-                    $null,
-                    [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
-                )
-
-                if ($Value -is [string] -and $Value -ceq '%CDKEY%')
-                    $BadKeys += $SubKeyPath
-            }
-            finally
-            {
-                if ($null -ne $Key)
-                    $Key.Dispose()
-            }
-        }
-
-        if ($BadKeys.Count -eq 0) {
-            return
-        }
-
-        $NewValue = New-ErgcKey
-
-        foreach ($SubKeyPath in $BadKeys) {
-            $Key = $null
-            try
-            {
-                $Key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey(
-                    $SubKeyPath,
-                    $true
-                )
-
-                if ($null -eq $Key)
-                    continue
-
-                # Ещё раз проверяем значение непосредственно перед записью.
-                $CurrentValue = $Key.GetValue(
-                    '',
-                    $null,
-                    [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
-                )
-
-                if ($CurrentValue -is [string] -and $CurrentValue -ceq '%CDKEY%')
-                    {
-                        $Key.SetValue(
-                            '',
-                            $NewValue,
-                            [Microsoft.Win32.RegistryValueKind]::String
-                    )
-
-                    Write-Log "Fixed: HKLM\$SubKeyPath -> $NewValue"
-                }
-            }
-            finally
-            {
-                if ($null -ne $Key)
-                {
-                    $Key.Dispose()
-                }
-            }
-        }
-    }
-    catch {
-
-        Write-Log "ERROR: $($_.Exception.Message)"
-    }
-}
-
-#
-Write-Log "CNCErgcFix watcher started."
-Repair-Ergc
-
-# ------------------------------------------------------------
-# WMI watcher
-#
-# Listen events in Electronic Arts.
-# ------------------------------------------------------------
-
-$Query = @"
-SELECT *
-FROM RegistryTreeChangeEvent
-WHERE Hive = 'HKEY_LOCAL_MACHINE'
-AND RootPath = '$WmiRootPath'
-"@
-
-try
-{
-    Register-WmiEvent -Namespace 'root\default' -Query $Query -SourceIdentifier 'CNCErgcFix.RegistryChange' | Out-Null
-
-    while ($true)
-    {
-
-        $Event = Wait-Event -SourceIdentifier 'CNCErgcFix.RegistryChange'
-
-        if ($null -ne $Event)
-            Remove-Event -EventIdentifier $Event.EventIdentifier -ErrorAction SilentlyContinue
-
-        # Timeout to wait the game finish write
-        Start-Sleep -Milliseconds 50
-
-        Repair-Ergc
-    }
-}
-catch
-{
-    Write-Log "WMI WATCHER ERROR: $($_.Exception.Message)"
-    exit 1
-}
-finally
-{
-    Unregister-Event -SourceIdentifier 'CNCErgcFix.RegistryChange' -ErrorAction SilentlyContinue
-}
+Write-Host "PowerShell script file inside bat!"
