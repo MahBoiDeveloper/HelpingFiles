@@ -113,13 +113,7 @@ setlocal enabledelayedexpansion
         (
             echo $LogFile = '%install_dir%\%log_file%'
 
-            echo $ErgcPaths = @(
-            echo     "%G%",
-            echo     "%GZH%",
-            echo     "%TW%",
-            echo     "%KW%",
-            echo     "%RA3%",
-            echo )
+            echo $ErgcPaths = @( "%G%", "%GZH%", "%TW%", "%KW%", "%RA3%" )
 
             echo function Write-Log
             echo {
