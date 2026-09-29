@@ -18,8 +18,9 @@ setlocal enabledelayedexpansion
 
 : Variables and constans
     : General for bat type
-    set ps=powershell
+    set ps=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe
     set psc=%ps% -nop -c
+    set psf=%ps% -NoProfile -ExecutionPolicy Bypass -File
     set "COLOR.GREEN=42;97m"
     set "COLOR.RED=41;97m"
     set opcode=
@@ -28,6 +29,7 @@ setlocal enabledelayedexpansion
     set log_file=CNCErgcFix.log
     set ps_file=CNCErgcFix.ps1
     set dir_name=CNCErgcFix
+    set task_name=%dir_name%
     set option_ad=%appdata%\%dir_name%
     set option_lad=%localappdata%\%dir_name%
     set option_sd=%systemdrive%\%dir_name%
