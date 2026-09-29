@@ -141,7 +141,9 @@ setlocal enabledelayedexpansion
             echo                     $false
             echo                 ^)
             echo                 if ^($null -eq $Key^)
+            echo                 {
             echo                     continue
+            echo                 }
             echo                 # If empty then value is "(Default)"
             echo                 $Value = $Key.GetValue^(
             echo                     '',
@@ -149,16 +151,22 @@ setlocal enabledelayedexpansion
             echo                     [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
             echo                 ^)
             echo                 if ^($Value -is [string] -and $Value -ceq '%%CDKEY%%'^)
+            echo                 {
             echo                     $BadKeys += $SubKeyPath
+            echo                 }
             echo             }
             echo             finally
             echo             {
             echo                 if ^($null -ne $Key^)
+            echo                 {
             echo                     $Key.Dispose^(^)
+            echo                 }
             echo             }
             echo         }
             echo         if ^($BadKeys.Count -eq 0^)
+            echo         {
             echo             return
+            echo         }
             echo         $NewValue = New-ErgcKey
             echo         foreach ^($SubKeyPath in $BadKeys^)
             echo         {
@@ -167,7 +175,9 @@ setlocal enabledelayedexpansion
             echo             {
             echo                 $Key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey^($SubKeyPath, $true^)
             echo                 if ^($null -eq $Key^)
+            echo                 {
             echo                     continue
+            echo                 }
             echo                 # Check value before write
             echo                 $CurrentValue = $Key.GetValue^('', $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames^)
             echo                 if ^($CurrentValue -is [string] -and $CurrentValue -ceq '%%CDKEY%%'^)
@@ -179,7 +189,9 @@ setlocal enabledelayedexpansion
             echo             finally
             echo             {
             echo                 if ^($null -ne $Key^)
+            echo                 {
             echo                     $Key.Dispose^(^)
+            echo                 }
             echo             }
             echo         }
             echo     }
@@ -206,7 +218,9 @@ setlocal enabledelayedexpansion
             echo     {
             echo         $Event = Wait-Event -SourceIdentifier 'CNCErgcFix.RegistryChange'
             echo         if ^($null -ne $Event^)
+            echo         {
             echo             Remove-Event -EventIdentifier $Event.EventIdentifier -ErrorAction SilentlyContinue
+            echo         }
             echo         # Timeout to wait the game finish write
             echo         Start-Sleep -Milliseconds 50
             echo         Repair-Ergc
