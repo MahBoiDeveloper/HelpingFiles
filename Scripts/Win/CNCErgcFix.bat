@@ -86,13 +86,13 @@ goto :exit
     echo:             [2] Remove fix
     echo:             [3] Check fix status
     echo:             [4] Run legacy one-time fix
-    echo:             [5] WIP
+    :: echo:             [5] WIP
     echo:             __________________________________________________
     echo:             
     echo:             [6] Change install directory
     echo:             [7] Change new ergc key
-    echo:             [8] WIP
-    echo:             [9] WIP
+    :: echo:             [8] WIP
+    :: echo:             [9] WIP
     echo: 
     echo:             [0] Exit
     echo:       ______________________________________________________________
@@ -100,7 +100,7 @@ goto :exit
     echo:             New key: %ergc_key%
     echo:             Install dir: %install_dir%
     echo: 
-    call :write "%COLOR.GREEN%" "                  Enter key from set [0,1,2,3,4,5,6,7,8,9]                  "
+    call :write "%COLOR.GREEN%" "                    Enter key from set [0,1,2,3,4,6,7,9]                    "
     choice /C:1234567890 /N
     set opcode=%errorlevel%
     if %opcode%==0 (
@@ -254,7 +254,7 @@ exit /b
 
     if errorlevel 1 (
         call :write "%COLOR.RED%" "Failed to create the scheduled task"
-        if not "%~1"=="1" pause
+        if not "%~1"=="1" echo. & pause
         exit /b 1
     )
 
@@ -263,12 +263,12 @@ exit /b
 
     if errorlevel 1 (
         call :write "%COLOR.RED%" "The task was created, but failed to start"
-        if not "%~1"=="1" pause
+        if not "%~1"=="1" echo. & pause
         exit /b 1
     )
     
     call :write "%COLOR.GREEN%" "Done"
-    if not "%~1"=="1" pause
+    if not "%~1"=="1" echo. & pause
 exit /b
 
 :remove_fix
@@ -285,7 +285,7 @@ exit /b
     rmdir /s /q "%install_dir%" > nul 2> nul
 
     call :write "%COLOR.GREEN%" "Done"
-    if not "%~1"=="1" pause
+    if not "%~1"=="1" echo. & pause
 exit /b
 
 :legacy_fix
@@ -305,16 +305,46 @@ exit /b
     
     echo.
     call :write "%COLOR.GREEN%" "Done"
-    if not "%~1"=="1" pause
+    if not "%~1"=="1" echo. & pause
 exit /b
 
 :status
-    reg query "%G%"   /ve 2>nul | findstr /c:"REG_SZ" | %psc% "$v = $input -replace '^.*?REG_SZ\s*',''; $b = $v -and $v -ne '%%CDKEY%%'; $bg = if ($b) { 'Green' } else { 'DarkRed' }; Write-Host ('Generals:      ') -n; Write-Host $v -back $bg -fore White"
-    reg query "%ZH%"  /ve 2>nul | findstr /c:"REG_SZ" | %psc% "$v = $input -replace '^.*?REG_SZ\s*',''; $b = $v -and $v -ne '%%CDKEY%%'; $bg = if ($b) { 'Green' } else { 'DarkRed' }; Write-Host ('Zero Hour:     ') -n; Write-Host $v -back $bg -fore White"
-    reg query "%TW%"  /ve 2>nul | findstr /c:"REG_SZ" | %psc% "$v = $input -replace '^.*?REG_SZ\s*',''; $b = $v -and $v -ne '%%CDKEY%%'; $bg = if ($b) { 'Green' } else { 'DarkRed' }; Write-Host ('Tiberium Wars: ') -n; Write-Host $v -back $bg -fore White"
-    reg query "%KW%"  /ve 2>nul | findstr /c:"REG_SZ" | %psc% "$v = $input -replace '^.*?REG_SZ\s*',''; $b = $v -and $v -ne '%%CDKEY%%'; $bg = if ($b) { 'Green' } else { 'DarkRed' }; Write-Host ('Kanes Wrath:   ') -n; Write-Host $v -back $bg -fore White"
-    reg query "%RA3%" /ve 2>nul | findstr /c:"REG_SZ" | %psc% "$v = $input -replace '^.*?REG_SZ\s*',''; $b = $v -and $v -ne '%%CDKEY%%'; $bg = if ($b) { 'Green' } else { 'DarkRed' }; Write-Host ('Red Alert 3:   ') -n; Write-Host $v -back $bg -fore White"
-    if not "%~1"=="1" pause
+    set "status_fix_dir="
+    for %%d in ("%install_dir%" "%option_ad%" "%option_lad%" "%option_sd%") do (
+        if not defined status_fix_dir if exist "%%~d\%ps_file%" set "status_fix_dir=%%~fd"
+    )
+
+    %psc% "Write-Host ('Fix directory:   ') -n"
+    if defined status_fix_dir (
+        call :write "%COLOR.GREEN%" "!status_fix_dir!"
+    ) else (
+        call :write "%COLOR.RED%" "not found"
+    )
+
+    set "watcher_pids="
+    for /f "tokens=2 delims==" %%P in ('wmic process where "Name='powershell.exe' and CommandLine like '%%CNCErgcFix.ps1%%'" get ProcessId /value 2^>nul ^| findstr /b /c:"ProcessId="') do (
+        if defined watcher_pids (
+            set "watcher_pids=!watcher_pids!, %%P"
+        ) else (
+            set "watcher_pids=%%P"
+        )
+    )
+
+    <nul set /p "=Watcher process: "
+    if defined watcher_pids (
+        call :write "%COLOR.GREEN%" "RUNNING (PID: !watcher_pids!)"
+    ) else (
+        call :write "%COLOR.RED%" "NOT RUNNING"
+    )
+    echo.
+
+    echo Game ergc keys:
+    reg query "HKLM\%G%"   /ve 2>nul | findstr /c:"REG_SZ" | %psc% "$v = $input -replace '.*?REG_SZ\s*',''; $b = $v -and $v -ne '%%CDKEY%%'; $bg = if ($b) { 'Green' } else { 'DarkRed' }; Write-Host ('Generals:      ') -n; Write-Host $v -back $bg -fore White"
+    reg query "HKLM\%ZH%"  /ve 2>nul | findstr /c:"REG_SZ" | %psc% "$v = $input -replace '.*?REG_SZ\s*',''; $b = $v -and $v -ne '%%CDKEY%%'; $bg = if ($b) { 'Green' } else { 'DarkRed' }; Write-Host ('Zero Hour:     ') -n; Write-Host $v -back $bg -fore White"
+    reg query "HKLM\%TW%"  /ve 2>nul | findstr /c:"REG_SZ" | %psc% "$v = $input -replace '.*?REG_SZ\s*',''; $b = $v -and $v -ne '%%CDKEY%%'; $bg = if ($b) { 'Green' } else { 'DarkRed' }; Write-Host ('Tiberium Wars: ') -n; Write-Host $v -back $bg -fore White"
+    reg query "HKLM\%KW%"  /ve 2>nul | findstr /c:"REG_SZ" | %psc% "$v = $input -replace '.*?REG_SZ\s*',''; $b = $v -and $v -ne '%%CDKEY%%'; $bg = if ($b) { 'Green' } else { 'DarkRed' }; Write-Host ('Kanes Wrath:   ') -n; Write-Host $v -back $bg -fore White"
+    reg query "HKLM\%RA3%" /ve 2>nul | findstr /c:"REG_SZ" | %psc% "$v = $input -replace '.*?REG_SZ\s*',''; $b = $v -and $v -ne '%%CDKEY%%'; $bg = if ($b) { 'Green' } else { 'DarkRed' }; Write-Host ('Red Alert 3:   ') -n; Write-Host $v -back $bg -fore White"
+    if not "%~1"=="1" echo. & pause
 exit /b
 
 :select_dir
