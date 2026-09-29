@@ -113,84 +113,84 @@ setlocal enabledelayedexpansion
         (
             echo $LogFile = '%install_dir%\%log_file%'
 
-            echo $ErgcPaths = @( "%G%", "%GZH%", "%TW%", "%KW%", "%RA3%" )
+            echo $ErgcPaths = @^( "%G%", "%ZH%", "%TW%", "%KW%", "%RA3%" ^)
 
             echo function Write-Log
             echo {
-            echo     param(
+            echo     param^(
             echo         [string]$Message
-            echo     )
+            echo     ^)
             echo     $Timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'
             echo     Add-Content -LiteralPath $LogFile -Value "[$Timestamp] $Message" -Encoding UTF8
             echo }
 
-            echo function New-ErgcKey { return 'KEKW' + (Get-Date -Format 'ddMMyyyyHHmmssff') }
+            echo function New-ErgcKey { return 'KEKW' + ^(Get-Date -Format 'ddMMyyyyHHmmssff'^) }
 
             echo function Repair-Ergc
             echo {
             echo     try
             echo     {
-            echo         $BadKeys = @()
-            echo         foreach ($SubKeyPath in $ErgcPaths) {
+            echo         $BadKeys = @^(^)
+            echo         foreach ^($SubKeyPath in $ErgcPaths^) {
             echo             $Key = $null
             echo             try
             echo             {
-            echo                 $Key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey(
+            echo                 $Key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey^(
             echo                     $SubKeyPath,
             echo                     $false
-            echo                 )
-            echo                 if ($null -eq $Key)
+            echo                 ^)
+            echo                 if ^($null -eq $Key^)
             echo                     continue
             echo                 # If empty then value is "(Default)"
-            echo                 $Value = $Key.GetValue(
+            echo                 $Value = $Key.GetValue^(
             echo                     '',
             echo                     $null,
             echo                     [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
-            echo                 )
-            echo                 if ($Value -is [string] -and $Value -ceq '%CDKEY%')
+            echo                 ^)
+            echo                 if ^($Value -is [string] -and $Value -ceq '%%CDKEY%%'^)
             echo                     $BadKeys += $SubKeyPath
             echo             }
             echo             finally
             echo             {
-            echo                 if ($null -ne $Key)
-            echo                     $Key.Dispose()
+            echo                 if ^($null -ne $Key^)
+            echo                     $Key.Dispose^(^)
             echo             }
             echo         }
-            echo         if ($BadKeys.Count -eq 0)
+            echo         if ^($BadKeys.Count -eq 0^)
             echo             return
             echo         $NewValue = New-ErgcKey
-            echo         foreach ($SubKeyPath in $BadKeys)
+            echo         foreach ^($SubKeyPath in $BadKeys^)
             echo         {
             echo             $Key = $null
             echo             try
             echo             {
-            echo                 $Key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey(
+            echo                 $Key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey^(
             echo                     $SubKeyPath,
             echo                     $true
-            echo                 )
-            echo                 if ($null -eq $Key)
+            echo                 ^)
+            echo                 if ^($null -eq $Key^)
             echo                     continue
             echo                 # Ещё раз проверяем значение непосредственно перед записью.
-            echo                 $CurrentValue = $Key.GetValue(
+            echo                 $CurrentValue = $Key.GetValue^(
             echo                     '',
             echo                     $null,
             echo                     [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
-            echo                 )
-            echo                 if ($CurrentValue -is [string] -and $CurrentValue -ceq '%CDKEY%')
+            echo                 ^)
+            echo                 if ^($CurrentValue -is [string] -and $CurrentValue -ceq '%%CDKEY%%'^)
             echo                 {
-            echo                         $Key.SetValue(
+            echo                         $Key.SetValue^(
             echo                             '',
             echo                             $NewValue,
             echo                             [Microsoft.Win32.RegistryValueKind]::String
-            echo                     )
+            echo                     ^)
             echo                     Write-Log "Fixed: HKLM\$SubKeyPath -> $NewValue"
             echo                 }
             echo             }
             echo             finally
             echo             {
-            echo                 if ($null -ne $Key)
+            echo                 if ^($null -ne $Key^)
             echo                 {
-            echo                     $Key.Dispose()
+            echo                     $Key.Dispose^(^)
             echo                 }
             echo             }
             echo         }
@@ -218,11 +218,11 @@ setlocal enabledelayedexpansion
 
             echo try
             echo {
-            echo     Register-WmiEvent -Namespace 'root\default' -Query $Query -SourceIdentifier 'CNCErgcFix.RegistryChange' | Out-Null
-            echo     while ($true)
+            echo     Register-WmiEvent -Namespace 'root\default' -Query $Query -SourceIdentifier 'CNCErgcFix.RegistryChange' ^| Out-Null
+            echo     while ^($true^)
             echo     {
             echo         $Event = Wait-Event -SourceIdentifier 'CNCErgcFix.RegistryChange'
-            echo         if ($null -ne $Event)
+            echo         if ^($null -ne $Event^)
             echo             Remove-Event -EventIdentifier $Event.EventIdentifier -ErrorAction SilentlyContinue
             echo         # Timeout to wait the game finish write
             echo         Start-Sleep -Milliseconds 50
@@ -239,7 +239,7 @@ setlocal enabledelayedexpansion
             echo     Unregister-Event -SourceIdentifier 'CNCErgcFix.RegistryChange' -ErrorAction SilentlyContinue
             echo }
 
-        ) >> %install_dir%\%ps_file%
+        ) > %install_dir%\%ps_file%
         
         call :write "%COLOR.GREEN%" "Done"
         if not "%~1"=="1" pause
