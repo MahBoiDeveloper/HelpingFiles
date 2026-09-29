@@ -109,7 +109,8 @@ setlocal enabledelayedexpansion
 
 : Main procedures
     :install_fix
-        mkdir %install_dir%
+        call :log "Install script to the %install_dir% folder..."
+        mkdir %install_dir% > nul 2> nul
         (
             echo $LogFile = '%install_dir%\%log_file%'
 
@@ -117,9 +118,7 @@ setlocal enabledelayedexpansion
 
             echo function Write-Log
             echo {
-            echo     param^(
-            echo         [string]$Message
-            echo     ^)
+            echo     param^([string]$Message^)
             echo     $Timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'
             echo     Add-Content -LiteralPath $LogFile -Value "[$Timestamp] $Message" -Encoding UTF8
             echo }
@@ -164,10 +163,7 @@ setlocal enabledelayedexpansion
             echo             $Key = $null
             echo             try
             echo             {
-            echo                 $Key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey^(
-            echo                     $SubKeyPath,
-            echo                     $true
-            echo                 ^)
+            echo                 $Key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey^($SubKeyPath, $true^)
             echo                 if ^($null -eq $Key^)
             echo                     continue
             echo                 # Ещё раз проверяем значение непосредственно перед записью.
@@ -178,24 +174,19 @@ setlocal enabledelayedexpansion
             echo                 ^)
             echo                 if ^($CurrentValue -is [string] -and $CurrentValue -ceq '%%CDKEY%%'^)
             echo                 {
-            echo                         $Key.SetValue^(
-            echo                             '',
-            echo                             $NewValue,
-            echo                             [Microsoft.Win32.RegistryValueKind]::String
-            echo                     ^)
+            echo                         $Key.SetValue^('', $NewValue, [Microsoft.Win32.RegistryValueKind]::String^)
             echo                     Write-Log "Fixed: HKLM\$SubKeyPath -> $NewValue"
             echo                 }
             echo             }
             echo             finally
             echo             {
             echo                 if ^($null -ne $Key^)
-            echo                 {
             echo                     $Key.Dispose^(^)
-            echo                 }
             echo             }
             echo         }
             echo     }
-            echo     catch {
+            echo     catch
+            echo     {
             echo         Write-Log "ERROR: $($_.Exception.Message)"
             echo     }
             echo }
