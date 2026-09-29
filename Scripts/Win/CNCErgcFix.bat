@@ -9,15 +9,15 @@
 cd /d %~dp0
 setlocal enabledelayedexpansion
 
-: Evaluate rights to the admin
+:: Evaluate rights to the admin
     net session >nul 2>&1
     if not %errorlevel%==0 (
         powershell "start %0 -verb runas"
         exit /b
     )
 
-: Variables and constans
-    : General for bat type
+:: Variables and constans
+    :: General for bat type
     set ps=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe
     set psc=%ps% -nop -c
     set psf=%ps% -NoProfile -ExecutionPolicy Bypass -File
@@ -25,7 +25,7 @@ setlocal enabledelayedexpansion
     set "COLOR.RED=41;97m"
     set opcode=
 
-    : General for this specific bat
+    :: General for this specific bat
     set log_file=CNCErgcFix.log
     set ps_file=CNCErgcFix.ps1
     set dir_name=CNCErgcFix
@@ -39,7 +39,7 @@ setlocal enabledelayedexpansion
     set install_dir=%option_sd%
     set reg_branch=
 
-    : Check win version
+    :: Check win version
     systeminfo | find "x64-based PC" > nul
     if %errorlevel%==0 (
         set reg_branch=%win64regpath%
@@ -47,14 +47,14 @@ setlocal enabledelayedexpansion
         set reg_branch=%win32regpath%
     )
 
-    : Game registry branches
+    :: Game registry branches
     set "G=%reg_branch%\EA Games\Generals\ergc"
     set "ZH=%reg_branch%\EA Games\Command and Conquer Generals Zero Hour\ergc"
     set "TW=%reg_branch%\Electronic Arts\Command and Conquer 3\ergc"
     set "KW=%reg_branch%\Electronic Arts\Command and Conquer 3 Kanes Wrath\ergc"
     set "RA3=%reg_branch%\Electronic Arts\Red Alert 3\ergc"
 
-: Menu procedures
+:: Menu procedures
 :cycle
     call :menu
     if %opcode%==1 call :install_fix & goto :cycle
@@ -68,7 +68,7 @@ setlocal enabledelayedexpansion
     if %opcode%==9 call :write "%COLOR.RED%" "WIP" & pause & goto :cycle
 goto :exit
 
-: Batch file main menu
+:: Batch file main menu
 :menu
     cls
     title CNC ergc Key Fix
@@ -77,7 +77,7 @@ goto :exit
     echo: 
     echo: 
     call :write "%COLOR.RED%"   "           WARNING: THIS SCRIPT EDITS YOUR TASK SCHEDULER SETTINGS          "
-    : call :write "%COLOR.RED%"   "               THIS PROGRAM COMES WITH ABSOLUTELY NO WARRANTY               "
+    :: call :write "%COLOR.RED%"   "               THIS PROGRAM COMES WITH ABSOLUTELY NO WARRANTY               "
     echo:       ______________________________________________________________
     echo: 
     echo:                                   ACTIONS 
@@ -109,7 +109,7 @@ goto :exit
     cls
 exit /b
 
-: Main procedures
+:: Main procedures
 :install_fix
     call :log "Install script to the %install_dir% folder..."
     mkdir "%install_dir%" > nul 2> nul
@@ -358,18 +358,18 @@ exit /b
     set "ergc_key=!new_ergc_key!"
 exit /b
 
-: Log message to console with timestamp
+:: Log message to console with timestamp
 :log
     echo [%date% -- %time:~0,-3%] %~1
 exit /b
 
-: Print color text (CMD)
-: https://stackoverflow.com/questions/2048509/how-to-echo-with-different-colors-in-the-windows-command-line
+:: Print color text (CMD)
+:: https://stackoverflow.com/questions/2048509/how-to-echo-with-different-colors-in-the-windows-command-line
 :write
     echo [%~1%~2[0m
 exit /b
 
-: Print color text (Powershell)
+:: Print color text (Powershell)
 :pswrite
     %ps% Write-Host %~3 -back %~1 -fore %~2
 exit /b
@@ -377,8 +377,8 @@ exit /b
 :exit
 goto :eof
 
-: PowerShell script content
-: To run this text as PS script use cmd batch code:
-: %psc% "$text = [IO.File]::ReadAllText('%~f0'); $code = ($text -split '(?m)^:__PS_SCRIPT__\r?\n', 2)[1]; & ([scriptblock]::Create($code))"
+:: PowerShell script content
+:: To run this text as PS script use cmd batch code:
+:: %psc% "$text = [IO.File]::ReadAllText('%~f0'); $code = ($text -split '(?m)^:__PS_SCRIPT__\r?\n', 2)[1]; & ([scriptblock]::Create($code))"
 :__PS_SCRIPT__
 Write-Host "PowerShell script file inside bat!"
