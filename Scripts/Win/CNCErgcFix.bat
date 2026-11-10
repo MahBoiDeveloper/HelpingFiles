@@ -112,6 +112,7 @@ exit /b
 :: Main procedures
 :install_fix
     call :log "Install script to the %install_dir% folder..."
+    copy "%0" %install_dir%\CNCErgcFix.bat
     mkdir "%install_dir%" > nul 2> nul
     (
         echo $LogFile = '%install_dir%\%log_file%'
