@@ -1,0 +1,9 @@
+! Нейроправила на бан мусора на мыло.сру
+e.mail.ru###ph-whiteline a.ph-logo_doodle
+e.mail.ru###logo-placeholder > a:not(#logo-brand):has(> img#logoImg)
+! Реклама над списком писем
+e.mail.ru##div:has(+ .new-menu):has(div.sc-enqwxq[lang])
+! Реклама между письмами
+e.mail.ru##.ReactVirtualized__Grid__innerScrollContainer > div:has(div.sc-enqwxq[lang])
+! Правая рекламная колонка
+e.mail.ru##div:has(> div > div > div > [data-promo-id="right-column-noads"]):has(div.sc-enqwxq[lang]):not(:has(.letter-list__react))
