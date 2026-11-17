@@ -2,8 +2,10 @@
 set -euo pipefail
 umask 077
 
-linux_user=rtunnel
-node_name=
+read -r -p 'Linux user [rtunnel]: ' linux_user
+linux_user=${linux_user:-rtunnel}
+read -r -p 'Node name [linux-server]: ' node_name
+node_name=${node_name:-linux-server}
 network_name=
 network_password=
 
@@ -21,10 +23,10 @@ fail() {
   exit 1
 }
 
-if [[ $EUID -ne 0 || $(dpkg --print-architecture) != amd64 ]]; then
-  fail 'Запусти скрипт от root на Ubuntu 24.04 x86-64.'
+if [[ $EUID -ne 0 ]] || ! ( . /etc/os-release && [[ ${ID:-} == ubuntu ]] ); then
+  fail 'Run this script as root on Ubuntu.'
 fi
-[[ -d /run/systemd/system ]] || fail 'Для автозапуска нужен системный экземпляр systemd.'
+[[ -d /run/systemd/system ]] || fail 'Automatic startup requires a system instance of systemd.'
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
@@ -34,7 +36,7 @@ apt-get install -y --no-install-recommends ca-certificates curl dbus-daemon \
 if [[ ! -c /dev/net/tun ]]; then
   modprobe tun || true
 fi
-[[ -c /dev/net/tun ]] || fail 'Виртуальной машине нужен доступ к /dev/net/tun.'
+[[ -c /dev/net/tun ]] || fail 'The virtual machine needs access to /dev/net/tun.'
 
 # Создаём учётную запись для службы OpenRad.
 if ! id "$linux_user" >/dev/null 2>&1; then
@@ -43,13 +45,13 @@ if ! id "$linux_user" >/dev/null 2>&1; then
   fi
   useradd --create-home --home-dir "/home/$linux_user" \
     --gid "$linux_user" --shell /usr/sbin/nologin -- "$linux_user"
-  printf 'Создан пользователь %s.\n' "$linux_user"
+  printf 'Created user %s.\n' "$linux_user"
 fi
 linux_uid=$(id -u "$linux_user")
-[[ $linux_uid -ne 0 ]] || fail "Выбери отдельного Linux-пользователя для OpenRad с UID, отличным от 0."
+[[ $linux_uid -ne 0 ]] || fail "Choose a dedicated Linux user for OpenRad with a non-zero UID."
 linux_home=$(getent passwd "$linux_user" | cut -d: -f6)
 linux_group=$(id -gn "$linux_user")
-[[ $linux_home == /* ]] || fail "Для пользователя $linux_user нужен абсолютный путь к домашнему каталогу."
+[[ $linux_home == /* ]] || fail "User $linux_user must have an absolute home directory path."
 if [[ ! -d "$linux_home" ]]; then
   install -d -m 0700 -o "$linux_user" -g "$linux_group" -- "$linux_home"
 fi
@@ -176,7 +178,7 @@ while true; do
   if (( SECONDS >= deadline )); then
     openrad status >&2 || true
     journalctl -u "$service" -n 30 --no-pager >&2 || true
-    fail 'OpenRad не подключился или не смог создать TAP-интерфейс за 90 секунд.'
+    fail 'OpenRad failed to connect or create the TAP interface within 90 seconds.'
   fi
   sleep 1
 done
