@@ -4,17 +4,20 @@ umask 077
 
 linux_user=rtunnel
 node_name=linux-server
-install_dir=/usr/local/lib/openrad
+default_install_dir=/usr/local/lib/openrad
+install_dir=$default_install_dir
 network_names=()
 network_passwords=()
 config_file=
 release_selection=
+remove_previous=0
 launcher=/usr/local/bin/openrad
 data_dir=/var/lib/openrad
 identity="$data_dir/profile/identity.json"
 unit_dir=/etc/systemd/system
 service=openrad.service
 timer=openrad.timer
+sudoers_file=/etc/sudoers.d/openrad-rtunnel
 repository=gringoestrangeiro/openrad
 releases_api=https://api.github.com/repos/$repository/releases
 
@@ -92,7 +95,8 @@ choose_release() {
 }
 
 collect_settings() {
-  local script_dir prompt_fd=0 interactive=0 network_name network_password
+  local script_dir prompt_fd=0 interactive=0 previous_install=0 answer
+  local selected_install_dir network_name network_password
   script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
   if [[ -f $PWD/openrad.ini ]]; then
     config_file=$PWD/openrad.ini
@@ -105,17 +109,30 @@ collect_settings() {
 
   if [[ -t 0 || -t 1 || -t 2 ]]; then
     interactive=1
+    if [[ -e $launcher || -e $default_install_dir/openrad || -e $sudoers_file ||
+      -e $unit_dir/$service || -e $unit_dir/$timer || -d $data_dir ]]; then
+      previous_install=1
+    fi
   fi
-  if [[ -z $config_file || ${#network_names[@]} == 0 || ( $interactive == 1 && -z $release_selection ) ]]; then
+  if [[ -z $config_file || ${#network_names[@]} == 0 || $previous_install == 1 ||
+    ( $interactive == 1 && -z $release_selection ) ]]; then
     # Keep prompts usable when the installer itself is piped to Bash.
     if [[ ! -t 0 && $interactive == 1 ]]; then
       exec {prompt_fd}</dev/tty || fail 'Cannot open a terminal; provide openrad.ini.'
     fi
     if [[ -z $config_file ]]; then
-      read -r -u "$prompt_fd" -p 'Linux user [rtunnel]: ' linux_user || fail 'Cannot read Linux user.'
+      IFS= read -r -u "$prompt_fd" -p "OpenRad install directory [$install_dir]: " selected_install_dir || fail 'Cannot read install directory.'
+      install_dir=${selected_install_dir:-$install_dir}
+      read -r -u "$prompt_fd" -p 'Linux user (rtunnel): ' linux_user || fail 'Cannot read Linux user.'
       linux_user=${linux_user:-rtunnel}
       read -r -u "$prompt_fd" -p 'Node name [linux-server]: ' node_name || fail 'Cannot read node name.'
       node_name=${node_name:-linux-server}
+    fi
+    if (( previous_install )) && read -r -u "$prompt_fd" \
+      -p 'Remove the previous OpenRad installation, including its local profile and networks? [y/N]: ' answer; then
+      case $answer in
+        [Yy]|[Yy][Ee][Ss]) remove_previous=1 ;;
+      esac
     fi
     if (( ${#network_names[@]} == 0 )); then
       IFS= read -r -u "$prompt_fd" -p 'Network name: ' network_name || fail 'Cannot read network name; provide [Networks] in openrad.ini.'
@@ -284,11 +301,105 @@ join_network() {
   ' bash "$bin" "$data_dir" "$network_name"
 }
 
-# Installation starts here.
+as_user() {
+  runuser -u "$linux_user" -- env -i HOME="$linux_home" PATH=/usr/bin:/bin "$@"
+}
+
+stop_cli_daemon() {
+  local daemon_bin=$bin
+  # Older installations kept the real binary at the launcher's path.
+  [[ -x $daemon_bin ]] || daemon_bin=$launcher
+  if [[ -x "$daemon_bin" ]] && as_user "$daemon_bin" --data-dir "$data_dir" --json status 2>/dev/null |
+    jq -e '(.data.process_id // 0) > 0' >/dev/null; then
+    as_user "$daemon_bin" --data-dir "$data_dir" stop
+  fi
+}
+
+uninstall_openrad() (
+  local service_file=$unit_dir/$service timer_file=$unit_dir/$timer
+  local line client sudoers_client= logs_dir
+  local client_pattern='^/[-a-zA-Z0-9_./ ]*/openrad$'
+  local exec_pattern='^ExecStart="(/[-a-zA-Z0-9_./ ]*/openrad)" --data-dir '
+  local rule_pattern='^([a-z_][a-z0-9_-]*) ALL=\(root\) NOPASSWD: (sha256:[0-9a-f]{64} )?(.+) tap-helper (--interface-name [a-zA-Z0-9_.-]+ )?--vip '
+  bin=
+  linux_user=
+
+  # A partial installation can have a sudoers rule before the service file is installed.
+  if [[ -f $sudoers_file ]]; then
+    while IFS= read -r line; do
+      if [[ $line =~ $rule_pattern ]]; then
+        linux_user=${BASH_REMATCH[1]}
+        sudoers_client=${BASH_REMATCH[3]//\\ / }
+        break
+      fi
+    done < "$sudoers_file"
+  fi
+  if [[ -f $service_file ]]; then
+    while IFS= read -r line; do
+      case $line in
+        User=*) linux_user=${line#User=} ;;
+        "ExecStart=$launcher --data-dir $data_dir __daemon") bin=$launcher ;;
+      esac
+      if [[ $line =~ $exec_pattern ]]; then
+        bin=${BASH_REMATCH[1]}
+      fi
+    done < "$service_file"
+  fi
+  bin=${bin:-${sudoers_client:-$default_install_dir/openrad}}
+
+  if [[ -e $timer_file || -L $timer_file ]]; then
+    systemctl disable --now "$timer"
+  elif systemctl is-active --quiet "$timer"; then
+    systemctl stop "$timer"
+  fi
+  if [[ -e $service_file || -L $service_file ]] || systemctl is-active --quiet "$service"; then
+    systemctl stop "$service"
+  fi
+
+  if [[ $bin =~ $client_pattern && $linux_user =~ ^[a-z_][a-z0-9_-]*$ ]] &&
+    linux_uid=$(id -u "$linux_user") && [[ $linux_uid != 0 ]]; then
+    linux_home=$(getent passwd "$linux_user" | cut -d: -f6)
+    if [[ $linux_home == /* && $linux_home != / ]]; then
+      stop_cli_daemon
+      logs_dir=$linux_home/.local/share/OpenRad
+      if [[ -d $logs_dir && ! -L $logs_dir ]]; then
+        as_user rm -rf --one-file-system -- "$logs_dir/logs"
+        as_user rmdir --ignore-fail-on-non-empty -- "$logs_dir"
+      fi
+    fi
+  fi
+
+  for client in "$bin" "$sudoers_client" "$default_install_dir/openrad"; do
+    [[ -e $client || -L $client ]] || continue
+    [[ $client =~ $client_pattern ]] || fail "Invalid installed OpenRad client path: $client"
+    (
+      cd -P -- "${client%/*}"
+      [[ $PWD == "${client%/*}" ]] || fail "OpenRad client directory has moved: $client"
+      rm -f -- ./openrad
+    )
+  done
+  if [[ -d $default_install_dir && ! -L $default_install_dir ]]; then
+    rmdir --ignore-fail-on-non-empty -- "$default_install_dir"
+  fi
+  rm -rf --one-file-system -- "$data_dir"
+  rm -f -- "$launcher" "$sudoers_file" "$service_file" "$timer_file"
+  systemctl daemon-reload
+  printf 'OpenRad and its local data have been removed.\n'
+)
+
+if (( $# > 0 )) && [[ $# != 1 || $1 != --uninstall ]]; then
+  fail 'Usage: install-openrad.sh [--uninstall]'
+fi
 if [[ $EUID -ne 0 ]] || ! ( . /etc/os-release && [[ ${ID:-} == ubuntu ]] ); then
   fail 'Run this script as root on Ubuntu.'
 fi
-[[ -d /run/systemd/system ]] || fail 'Automatic startup requires a system instance of systemd.'
+[[ -d /run/systemd/system ]] || fail 'This script requires a system instance of systemd.'
+if [[ ${1:-} == --uninstall ]]; then
+  uninstall_openrad
+  exit 0
+fi
+
+# Installation starts here.
 collect_settings
 
 export DEBIAN_FRONTEND=noninteractive
@@ -322,27 +433,9 @@ if [[ ! -d "$linux_home" ]]; then
   install -d -m 0700 -o "$linux_user" -g "$linux_group" -- "$linux_home"
 fi
 resolve_install_dir
-if [[ ! -d $install_dir ]]; then
-  install -d -m 0755 -o root -g root -- "$install_dir"
-fi
-install -d -m 0700 -o "$linux_user" -g "$linux_group" -- "$data_dir"
-
-as_user() {
-  runuser -u "$linux_user" -- env -i HOME="$linux_home" PATH=/usr/bin:/bin "$@"
-}
 
 openrad() {
   as_user "$bin" --data-dir "$data_dir" "$@"
-}
-
-stop_cli_daemon() {
-  local daemon_bin=$bin
-  # Older installations kept the real binary at the launcher's path.
-  [[ -x $daemon_bin ]] || daemon_bin=$launcher
-  if [[ -x "$daemon_bin" ]] && as_user "$daemon_bin" --data-dir "$data_dir" --json status 2>/dev/null |
-    jq -e '(.data.process_id // 0) > 0' >/dev/null; then
-    as_user "$daemon_bin" --data-dir "$data_dir" stop
-  fi
 }
 
 workdir=$(mktemp -d)
@@ -352,6 +445,13 @@ if [[ $release_selection == source ]]; then
 else
   download_release
 fi
+if (( remove_previous )); then
+  uninstall_openrad
+fi
+if [[ ! -d $install_dir ]]; then
+  install -d -m 0755 -o root -g root -- "$install_dir"
+fi
+install -d -m 0700 -o "$linux_user" -g "$linux_group" -- "$data_dir"
 cd /
 
 # systemd отслеживает процесс OpenRad напрямую.
@@ -419,14 +519,28 @@ fi
 
 # Повышенные права нужны помощнику TAP с конкретным VPN-адресом и UID.
 vpn_ip=$(as_user jq -er '.vip | strings | select(test("^26(\\.[0-9]{1,3}){3}$"))' "$identity")
+tap_interface=radminvpn0
+tap_args=(tap-helper)
+helper_help=$(as_user "$bin" tap-helper --help) || fail 'Cannot read the OpenRad TAP helper options.'
+if [[ $helper_help == *--interface-name* ]]; then
+  tap_interface=$(openrad --json interface-name | jq -er '.data.interface_name | strings') ||
+    fail 'Cannot read the OpenRad TAP interface name.'
+  [[ $tap_interface =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,14}$ ]] || fail 'Invalid OpenRad TAP interface name.'
+  tap_args+=(--interface-name "$tap_interface")
+fi
+tap_args+=(--vip "$vpn_ip" --owner "$linux_uid" --lan)
 # Pin the helper digest, since a custom InstallDir may be inside the user's home.
 binary_digest=$(sha256sum -- "$bin")
 binary_digest=${binary_digest%% *}
 sudoers_bin=${bin// /\\ }
-printf 'Defaults:%s fdexec=always\n%s ALL=(root) NOPASSWD: sha256:%s %s tap-helper --vip %s --owner %s --lan\n' \
-  "$linux_user" "$linux_user" "$binary_digest" "$sudoers_bin" "$vpn_ip" "$linux_uid" > "$workdir/openrad-sudoers"
+printf 'Defaults:%s fdexec=always\n%s ALL=(root) NOPASSWD: sha256:%s %s %s\n' \
+  "$linux_user" "$linux_user" "$binary_digest" "$sudoers_bin" "${tap_args[*]}" > "$workdir/openrad-sudoers"
 visudo -cf "$workdir/openrad-sudoers"
-install -m 0440 -o root -g root "$workdir/openrad-sudoers" /etc/sudoers.d/openrad-rtunnel
+sudoers_changed=0
+cmp -s "$workdir/openrad-sudoers" "$sudoers_file" || sudoers_changed=1
+install -m 0440 -o root -g root "$workdir/openrad-sudoers" "$sudoers_file"
+/usr/bin/sudo -n -l -U "$linux_user" -- "$bin" "${tap_args[@]}" >/dev/null ||
+  fail "sudoers does not allow the OpenRad TAP helper for $linux_user. Check $sudoers_file."
 write_launcher "$workdir/openrad-launcher"
 install -m 0755 -o root -g root "$workdir/openrad-launcher" "$launcher"
 
@@ -436,6 +550,9 @@ fi
 
 install -m 0644 -o root -g root "$workdir/$service" "$workdir/$timer" "$unit_dir/"
 systemctl daemon-reload
+if (( sudoers_changed )); then
+  systemctl try-restart "$service"
+fi
 if ! systemctl is-active --quiet "$service"; then
   stop_cli_daemon
 fi
@@ -469,5 +586,5 @@ systemctl is-enabled "$timer"
 openrad status
 openrad networks
 openrad peers
-ip -4 -brief address show dev radminvpn0
+ip -4 -brief address show dev "$tap_interface"
 printf '\nInstalled. Run openrad for status, openrad --help for CLI commands, or openrad restart to restart the service.\n'
