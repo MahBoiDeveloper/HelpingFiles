@@ -1,0 +1,27 @@
+# Save a copy of this template as openrad.ini in your current directory or
+# next to install-openrad.sh. Remove the leading semicolon and space from
+# the section headers and the lines you need, then set your own values.
+
+; [Settings]
+
+# Linux user account that runs the OpenRad service.
+; User=rtunnel
+
+# Client installation directory. Use an absolute path or start it with ~/
+# to resolve it relative to the specified Linux user's home directory.
+; InstallDir=/usr/local/lib/openrad
+
+# OpenRad node name as it appears on the network.
+; NodeName=linux-server
+
+# Use latest for the latest stable release, prerelease for the latest
+# prerelease, tag:v2.3.3 for a specific tag, or source to build the latest commit.
+; Release=latest
+
+; [Networks]
+
+# Enter one network per line in name=password format. Replace the example
+# names with your network names. Leave the password empty for a public network.
+# Everything after the first = is taken literally, including spaces and = signs.
+; MyPublicNetwork=
+; MyPrivateNetwork=replace-with-your-password

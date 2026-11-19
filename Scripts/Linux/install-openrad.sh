@@ -77,7 +77,7 @@ choose_release() {
   local prompt_fd=$1 choice tag
   printf '%s\n' '1) Latest stable release' '2) Latest prerelease' \
     '3) Release by tag' '4) Build the latest commit from source' >&2
-  while read -r -u "$prompt_fd" -p 'OpenRad version [1]: ' choice; do
+  while read -r -u "$prompt_fd" -p 'OpenRad version (default 1): ' choice; do
     case $choice in
       ''|1) release_selection=latest ;;
       2) release_selection=prerelease ;;
@@ -121,15 +121,15 @@ collect_settings() {
       exec {prompt_fd}</dev/tty || fail 'Cannot open a terminal; provide openrad.ini.'
     fi
     if [[ -z $config_file ]]; then
-      IFS= read -r -u "$prompt_fd" -p "OpenRad install directory [$install_dir]: " selected_install_dir || fail 'Cannot read install directory.'
+      IFS= read -r -u "$prompt_fd" -p "OpenRad install directory (default $install_dir): " selected_install_dir || fail 'Cannot read install directory.'
       install_dir=${selected_install_dir:-$install_dir}
-      read -r -u "$prompt_fd" -p 'Linux user (rtunnel): ' linux_user || fail 'Cannot read Linux user.'
+      read -r -u "$prompt_fd" -p 'Linux user (default rtunnel): ' linux_user || fail 'Cannot read Linux user.'
       linux_user=${linux_user:-rtunnel}
-      read -r -u "$prompt_fd" -p 'Node name [linux-server]: ' node_name || fail 'Cannot read node name.'
+      read -r -u "$prompt_fd" -p 'Node name (default linux-server): ' node_name || fail 'Cannot read node name.'
       node_name=${node_name:-linux-server}
     fi
     if (( previous_install )) && read -r -u "$prompt_fd" \
-      -p 'Remove the previous OpenRad installation, including its local profile and networks? [y/N]: ' answer; then
+      -p 'Remove the previous OpenRad installation, including its local profile and networks? (default no): ' answer; then
       case $answer in
         [Yy]|[Yy][Ee][Ss]) remove_previous=1 ;;
       esac
@@ -137,7 +137,7 @@ collect_settings() {
     if (( ${#network_names[@]} == 0 )); then
       IFS= read -r -u "$prompt_fd" -p 'Network name: ' network_name || fail 'Cannot read network name; provide [Networks] in openrad.ini.'
       [[ -n $network_name ]] || fail 'Network name must not be empty.'
-      IFS= read -r -s -u "$prompt_fd" -p 'Network password (empty for a public network): ' network_password || fail 'Cannot read network password.'
+      IFS= read -r -s -u "$prompt_fd" -p 'Network password for a private network (default empty): ' network_password || fail 'Cannot read network password.'
       printf '\n' >&2
       network_names+=("$network_name")
       network_passwords+=("$network_password")
